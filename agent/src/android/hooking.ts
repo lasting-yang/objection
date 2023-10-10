@@ -274,9 +274,32 @@ export const watch = (pattern: string, dargs: boolean, dbt: boolean, dret: boole
   });
 };
 
+function findClassLoader(className) {
+  let resultLoader = null
+  Java.enumerateClassLoaders({
+      onMatch: function (loader) {
+          try {
+              if (loader.findClass(className)) {
+                  resultLoader = loader;
+              }
+          } catch (e) {
+          }
+      }, onComplete: function () {
+      }
+  })
+  return resultLoader;
+}
+function getClassWrapper(className) {
+  try {
+      return Java.use(className);
+  } catch (error) {
+      return Java.ClassFactory.get(findClassLoader(className)).use(className);
+  }
+}
+
 const watchClass = (clazz: string, job: IJob, dargs: boolean = false, dbt: boolean = false, dret: boolean = false): Promise<void> => {
   return wrapJavaPerform(() => {
-    const clazzInstance: JavaClass = Java.use(clazz);
+    const clazzInstance: JavaClass = getClassWrapper(clazz);
 
     clazzInstance.class.getDeclaredMethods().map((method) => {
       // perform a cleanup of the method. An example after toGenericString() would be:
@@ -319,7 +342,7 @@ const watchMethod = (
 
   return wrapJavaPerform(() => {
     const throwable: Throwable = Java.use("java.lang.Throwable");
-    const targetClass: JavaClass = Java.use(clazz);
+    const targetClass: JavaClass = getClassWrapper(clazz);
 
     // Ensure that the method exists on the class
     if (targetClass[method] === undefined) {
